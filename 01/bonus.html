@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Interactive White Cube</title>
+	<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+	<style>
+		html, body {
+			width: 100%;
+			height: 100%;
+			margin: 0;
+			overflow: hidden;
+			background: #000;
+		}
+	</style>
+</head>
+<body>
+	<script>
+		var scene = new THREE.Scene();
+		var camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+		camera.position.set(3, 2, 5);
+		camera.lookAt(0, 0, 0);
+
+		var renderer = new THREE.WebGLRenderer({ antialias: true });
+		renderer.setSize(window.innerWidth, window.innerHeight);
+		document.body.appendChild(renderer.domElement);
+
+		var cube = new THREE.Mesh(
+			new THREE.BoxGeometry(1.5, 1.5, 1.5),
+			new THREE.MeshStandardMaterial({ color: 0xffffff })
+		);
+		scene.add(cube);
+
+		scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+		var light = new THREE.DirectionalLight(0xffffff, 2);
+		light.position.set(2, 3, 4);
+		scene.add(light);
+
+		var dragging = false;
+		var previousX = 0;
+		var previousY = 0;
+
+		renderer.domElement.addEventListener('pointerdown', function (event) {
+			dragging = true;
+			previousX = event.clientX;
+			previousY = event.clientY;
+			renderer.domElement.setPointerCapture(event.pointerId);
+		});
+
+		renderer.domElement.addEventListener('pointermove', function (event) {
+			if (!dragging) return;
+			cube.rotation.y += (event.clientX - previousX) * 0.01;
+			cube.rotation.x += (event.clientY - previousY) * 0.01;
+			previousX = event.clientX;
+			previousY = event.clientY;
+		});
+
+		renderer.domElement.addEventListener('pointerup', function () {
+			dragging = false;
+		});
+
+		window.addEventListener('resize', function () {
+			camera.aspect = window.innerWidth / window.innerHeight;
+			camera.updateProjectionMatrix();
+			renderer.setSize(window.innerWidth, window.innerHeight);
+		});
+
+		function animate() {
+			requestAnimationFrame(animate);
+			renderer.render(scene, camera);
+		}
+
+		animate();
+	</script>
+</body>
+</html>

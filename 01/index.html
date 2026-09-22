@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Interactive White Cube</title>
+	<script src="https://get.goXTK.com/xtk_edge.js"></script>
+	<style>
+		html, body, #renderer {
+			width: 100%;
+			height: 100%;
+			margin: 0;
+			overflow: hidden;
+			background: #000;
+		}
+	</style>
+</head>
+<body>
+	<div id="renderer"></div>
+	<script>
+		window.onload = function () {
+			var renderer = new X.renderer3D();
+			renderer.container = 'renderer';
+			renderer.init();
+
+			var cube = new X.cube();
+			cube.color = [1, 1, 1];
+			renderer.add(cube);
+			renderer.render();
+		};
+	</script>
+</body>
+</html>

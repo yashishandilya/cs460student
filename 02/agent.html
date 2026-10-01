@@ -1,0 +1,1364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Creative Cube Visualizations | XTK & WebGL</title>
+  
+  <!-- Primary XTK Library with Offline Fallback -->
+  <script type="text/javascript" src="https://get.goxtk.com/xtk_edge.js"></script>
+  <script type="text/javascript">
+    if (typeof X === 'undefined') {
+      document.write('<script type="text/javascript" src="js/xtk_edge.js"><\/script>');
+    }
+  </script>
+
+  <style>
+    :root {
+      --bg-dark: #07090e;
+      --panel-bg: rgba(14, 19, 32, 0.72);
+      --panel-border: rgba(255, 255, 255, 0.12);
+      --accent-cyan: #00f2fe;
+      --accent-pink: #ff007f;
+      --accent-purple: #7928ca;
+      --accent-gold: #f6d365;
+      --text-main: #f0f4f8;
+      --text-muted: #8b9bb4;
+      --glass-blur: blur(16px);
+      --card-radius: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    html, body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at 50% 15%, rgba(0, 242, 254, 0.08) 0%, transparent 60%),
+        radial-gradient(circle at 80% 85%, rgba(121, 40, 202, 0.08) 0%, transparent 60%),
+        radial-gradient(circle at 10% 80%, rgba(255, 0, 127, 0.06) 0%, transparent 60%);
+      width: 100%;
+      height: 100%;
+      overflow: hidden !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: var(--text-main);
+    }
+
+    /* Fullscreen WebGL Canvas Wrapper */
+    #canvas-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      cursor: grab;
+    }
+
+    #canvas-container:active {
+      cursor: grabbing;
+    }
+
+    /* HUD Overlay Layer - passes clicks to canvas except on interactive elements */
+    #ui-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 16px 20px;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+
+    #ui-overlay.hidden {
+      opacity: 0;
+      pointer-events: none !important;
+      transform: scale(0.98);
+    }
+
+    /* Interactive Elements inside HUD */
+    .interactive {
+      pointer-events: auto;
+    }
+
+    /* Top Navigation Bar */
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: var(--panel-bg);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--panel-border);
+      padding: 10px 18px;
+      border-radius: var(--card-radius);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+    }
+
+    .brand-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 16px;
+      color: #fff;
+      box-shadow: 0 0 15px rgba(0, 242, 254, 0.4);
+    }
+
+    .brand-text h1 {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      background: linear-gradient(90deg, #fff, var(--text-muted));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-text p {
+      font-size: 11px;
+      color: var(--accent-cyan);
+      font-weight: 500;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+    }
+
+    .stats-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .stat-badge {
+      background: var(--panel-bg);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--panel-border);
+      padding: 8px 14px;
+      border-radius: var(--card-radius);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    }
+
+    .stat-badge span.value {
+      color: #fff;
+      font-family: monospace;
+      font-size: 13px;
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      background: #10b981;
+      border-radius: 50%;
+      box-shadow: 0 0 10px #10b981;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.3); opacity: 0.6; }
+    }
+
+    /* Main Central Content Workspace */
+    .workspace {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      width: 100%;
+      max-width: 1600px;
+      margin: 0 auto;
+      gap: 20px;
+    }
+
+    /* Left Control Sidebar Panel */
+    .control-panel {
+      background: var(--panel-bg);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--card-radius);
+      padding: 18px;
+      width: 320px;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .control-panel::-webkit-scrollbar {
+      width: 4px;
+    }
+    .control-panel::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+    }
+
+    .panel-section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      font-weight: 700;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .panel-section-title .hint {
+      font-size: 10px;
+      color: var(--accent-cyan);
+      text-transform: none;
+    }
+
+    /* Mode Selection Buttons */
+    .mode-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 6px;
+    }
+
+    .mode-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 10px 12px;
+      color: var(--text-main);
+      font-size: 13px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .mode-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+      transform: translateX(3px);
+    }
+
+    .mode-btn.active {
+      background: linear-gradient(90deg, rgba(0, 242, 254, 0.18), rgba(121, 40, 202, 0.18));
+      border-color: var(--accent-cyan);
+      color: #fff;
+      font-weight: 600;
+      box-shadow: 0 0 16px rgba(0, 242, 254, 0.25);
+    }
+
+    .mode-btn .key-hint {
+      font-size: 10px;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--text-muted);
+      font-family: monospace;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Color Palette Pills */
+    .color-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+    }
+
+    .color-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 8px 10px;
+      color: var(--text-main);
+      font-size: 11px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .color-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .color-btn.active {
+      border-color: #fff;
+      background: rgba(255, 255, 255, 0.15);
+      font-weight: 600;
+    }
+
+    .color-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* Slider Controls */
+    .slider-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .slider-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .slider-header span.val {
+      color: var(--accent-cyan);
+      font-family: monospace;
+    }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent-cyan);
+      box-shadow: 0 0 8px var(--accent-cyan);
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+
+    input[type=range]::-webkit-slider-thumb:hover {
+      transform: scale(1.25);
+    }
+
+    /* Quick Action Buttons */
+    .action-row {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+    }
+
+    .action-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 9px 10px;
+      color: var(--text-main);
+      font-size: 11px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .action-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .action-btn.active {
+      background: var(--accent-cyan);
+      color: #000;
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 14px rgba(0, 242, 254, 0.4);
+    }
+
+    .action-btn.full-width {
+      grid-column: span 2;
+    }
+
+    /* Camera Preset Bar (Floating Bottom Right) */
+    .camera-panel {
+      background: var(--panel-bg);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--card-radius);
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+    }
+
+    .cam-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      margin-right: 4px;
+    }
+
+    .cam-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 6px 12px;
+      color: var(--text-main);
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .cam-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: var(--accent-cyan);
+    }
+
+    /* Toast Notification */
+    #toast {
+      position: fixed;
+      top: 90px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-20px);
+      background: rgba(14, 19, 32, 0.9);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--accent-cyan);
+      color: #fff;
+      padding: 10px 22px;
+      border-radius: 30px;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 8px 24px rgba(0, 242, 254, 0.3);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* Floating Hide/Show Button when HUD is toggled */
+    #toggle-hud-btn {
+      position: fixed;
+      top: 16px;
+      right: 20px;
+      z-index: 20;
+      background: var(--panel-bg);
+      backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      padding: 8px 14px;
+      color: var(--text-main);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      transition: all 0.2s;
+    }
+
+    #toggle-hud-btn:hover {
+      border-color: var(--accent-cyan);
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    /* Fallback Banner */
+    #error-banner {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(20, 10, 15, 0.95);
+      border: 1px solid #ef4444;
+      border-radius: 16px;
+      padding: 24px;
+      max-width: 500px;
+      text-align: center;
+      z-index: 999;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Floating Toggle HUD Button (always visible) -->
+  <button id="toggle-hud-btn" class="interactive" onclick="toggleHUD()" title="Press [H] to toggle HUD">
+    <span>👁</span> <span id="hud-toggle-text">Hide HUD</span> <span style="font-size:10px;opacity:0.6;font-family:monospace">[H]</span>
+  </button>
+
+  <!-- Toast Notification -->
+  <div id="toast"><span id="toast-icon">✨</span><span id="toast-msg">Mode Activated</span></div>
+
+  <!-- WebGL Canvas Container -->
+  <div id="canvas-container"></div>
+
+  <!-- Fallback Error Banner if WebGL Fails -->
+  <div id="error-banner">
+    <h3 style="color:#ef4444;margin-bottom:8px;">WebGL / XTK Initialization Error</h3>
+    <p id="error-msg" style="font-size:13px;color:#cbd5e1;line-height:1.5;">Could not initialize WebGL context.</p>
+  </div>
+
+  <!-- Glassmorphism HUD Overlay Layer -->
+  <div id="ui-overlay">
+    
+    <!-- Top Bar -->
+    <header class="top-bar">
+      <div class="brand-group interactive">
+        <div class="brand-icon">X</div>
+        <div class="brand-text">
+          <h1>Creative Cube Visualizations</h1>
+          <p>XTK Framework &bull; WebGL Dynamic Engine</p>
+        </div>
+      </div>
+
+      <div class="stats-group">
+        <div class="stat-badge interactive">
+          <div class="pulse-dot"></div>
+          <span>FPS:</span>
+          <span class="value" id="fps-counter">60</span>
+        </div>
+        <div class="stat-badge interactive">
+          <span>Cubes:</span>
+          <span class="value" id="cube-counter">125</span>
+        </div>
+        <div class="stat-badge interactive" style="display:none;" id="audio-stat">
+          <span>Audio:</span>
+          <span class="value" style="color:var(--accent-cyan);">Active</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Workspace Controls -->
+    <main class="workspace">
+      
+      <!-- Left Sidebar Panel -->
+      <aside class="control-panel interactive">
+        
+        <!-- Visualization Modes -->
+        <section>
+          <div class="panel-section-title">
+            <span>Visual Mode</span>
+            <span class="hint">Keys 1 - 5</span>
+          </div>
+          <div class="mode-grid">
+            <button class="mode-btn active" data-mode="0" onclick="setMode(0)">
+              <span>🌊 Sine Wave Ocean</span>
+              <span class="key-hint">1</span>
+            </button>
+            <button class="mode-btn" data-mode="1" onclick="setMode(1)">
+              <span>🧊 Rubik's Tesseract</span>
+              <span class="key-hint">2</span>
+            </button>
+            <button class="mode-btn" data-mode="2" onclick="setMode(2)">
+              <span>🪐 Celestial Vortex</span>
+              <span class="key-hint">3</span>
+            </button>
+            <button class="mode-btn" data-mode="3" onclick="setMode(3)">
+              <span>🧬 Quantum Helix</span>
+              <span class="key-hint">4</span>
+            </button>
+            <button class="mode-btn" data-mode="4" onclick="setMode(4)">
+              <span>💥 Supernova Star</span>
+              <span class="key-hint">5</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- Color Themes -->
+        <section>
+          <div class="panel-section-title">
+            <span>Color Palette</span>
+            <span class="hint">Key [C]</span>
+          </div>
+          <div class="color-grid">
+            <button class="color-btn active" data-theme="neon" onclick="setTheme('neon')">
+              <div class="color-dot" style="background: linear-gradient(45deg, #00f2fe, #ff007f);"></div>
+              <span>Cyber Neon</span>
+            </button>
+            <button class="color-btn" data-theme="rainbow" onclick="setTheme('rainbow')">
+              <div class="color-dot" style="background: linear-gradient(45deg, #ff0000, #00ff00, #0000ff);"></div>
+              <span>Rainbow</span>
+            </button>
+            <button class="color-btn" data-theme="sunset" onclick="setTheme('sunset')">
+              <div class="color-dot" style="background: linear-gradient(45deg, #f12711, #f5af19);"></div>
+              <span>Sunset Gold</span>
+            </button>
+            <button class="color-btn" data-theme="aurora" onclick="setTheme('aurora')">
+              <div class="color-dot" style="background: linear-gradient(45deg, #00f2fe, #4facfe, #00c6ff);"></div>
+              <span>Cosmic Aurora</span>
+            </button>
+            <button class="color-btn" data-theme="vaporwave" onclick="setTheme('vaporwave')">
+              <div class="color-dot" style="background: linear-gradient(45deg, #ff758c, #ff7eb3, #7028e4);"></div>
+              <span>Vaporwave</span>
+            </button>
+            <button class="color-btn" data-theme="magic" onclick="setTheme('magic')" title="XTK Built-in Magic Normal Shading">
+              <div class="color-dot" style="background: linear-gradient(45deg, #fff, #9333ea);"></div>
+              <span>Magic Mode</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- Dynamic Sliders -->
+        <section class="slider-group">
+          <div class="panel-section-title">
+            <span>Animation & Dynamics</span>
+          </div>
+          
+          <div class="slider-item">
+            <div class="slider-header">
+              <span>Speed</span>
+              <span class="val" id="val-speed">1.0x</span>
+            </div>
+            <input type="range" id="slider-speed" min="0.1" max="3.0" step="0.1" value="1.0" oninput="updateSliders()" />
+          </div>
+
+          <div class="slider-item">
+            <div class="slider-header">
+              <span>Amplitude / Scale</span>
+              <span class="val" id="val-amp">1.0x</span>
+            </div>
+            <input type="range" id="slider-amp" min="0.3" max="2.5" step="0.1" value="1.0" oninput="updateSliders()" />
+          </div>
+
+          <div class="slider-item">
+            <div class="slider-header">
+              <span>Cube Spin</span>
+              <span class="val" id="val-spin">1.0x</span>
+            </div>
+            <input type="range" id="slider-spin" min="0.0" max="3.0" step="0.1" value="1.0" oninput="updateSliders()" />
+          </div>
+
+          <div class="slider-item">
+            <div class="slider-header">
+              <span>Cube Opacity</span>
+              <span class="val" id="val-opacity">0.9</span>
+            </div>
+            <input type="range" id="slider-opacity" min="0.2" max="1.0" step="0.05" value="0.9" oninput="updateSliders()" />
+          </div>
+        </section>
+
+        <!-- Actions -->
+        <section class="action-row">
+          <button class="action-btn full-width" onclick="triggerShockwave()" title="Click canvas or press here to radiate a shockwave">
+            <span>💥</span> <span>Shockwave Pulse</span>
+          </button>
+          <button class="action-btn" id="btn-pause" onclick="togglePause()">
+            <span id="pause-icon">⏸</span> <span id="pause-text">Pause</span>
+          </button>
+          <button class="action-btn" id="btn-orbit" onclick="toggleOrbit()">
+            <span>🔄</span> <span id="orbit-text">Auto Orbit</span>
+          </button>
+          <button class="action-btn full-width" id="btn-sound" onclick="toggleSound()">
+            <span id="sound-icon">🔈</span> <span id="sound-text">Sound: Synth Muted</span>
+          </button>
+        </section>
+
+      </aside>
+
+      <!-- Camera Presets Bottom Bar -->
+      <nav class="camera-panel interactive">
+        <span class="cam-label">Camera</span>
+        <button class="cam-btn" onclick="setCameraView('iso')">Isometric</button>
+        <button class="cam-btn" onclick="setCameraView('top')">Top-Down</button>
+        <button class="cam-btn" onclick="setCameraView('side')">Front View</button>
+        <button class="cam-btn" onclick="setCameraView('close')">Macro Core</button>
+        <button class="cam-btn" onclick="setCameraView('reset')" style="color:var(--accent-cyan);">Reset [R]</button>
+      </nav>
+
+    </main>
+
+  </div>
+
+  <!-- Visualizer Core Logic -->
+  <script type="text/javascript">
+    // Global Constants
+    const NUM_CUBES = 125; // 5x5x5 pool enables all geometries with seamless morphing
+    const CUBE_SIZE = 11;  // Crisp proportions with optimal gap spacing
+
+    // Visual State Management
+    let renderer = null;
+    let cubes = [];
+    let currentPositions = []; // {x, y, z}
+    let targetPositions = [];  // {x, y, z}
+    let initialLocalRotations = []; // random offsets for realistic multi-cube tumble
+
+    let activeMode = 0;       // 0: Wave, 1: Tesseract, 2: Vortex, 3: Helix, 4: Supernova
+    let activeTheme = 'neon'; // neon, rainbow, sunset, aurora, vaporwave, magic
+    let isPaused = false;
+    let autoOrbit = false;
+    let animTime = 0.0;
+    let lastTimestamp = performance.now();
+
+    // Tunable Parameters
+    let animSpeed = 1.0;
+    let animAmp = 1.0;
+    let spinSpeed = 1.0;
+    let cubeOpacity = 0.9;
+
+    // Interactive Shockwave State
+    let shockwaveActive = false;
+    let shockwaveRadius = 0.0;
+    let shockwaveStrength = 0.0;
+
+    // Performance & FPS Tracking
+    let frameCount = 0;
+    let lastFpsTime = performance.now();
+    let currentFps = 60;
+
+    // Mode Titles for notifications
+    const MODE_NAMES = [
+      "🌊 Sine Wave Ocean",
+      "🧊 Rubik's Tesseract Matrix",
+      "🪐 Celestial Vortex Rings",
+      "🧬 Quantum Double Helix",
+      "💥 Supernova Star Pulse"
+    ];
+
+    const THEME_NAMES = {
+      'neon': '⚡ Cyberpunk Neon',
+      'rainbow': '🌈 Rainbow Prism',
+      'sunset': '🌅 Solar Sunset',
+      'aurora': '🌌 Cosmic Aurora',
+      'vaporwave': '🔮 Vaporwave Pastel',
+      'magic': '✨ XTK Magic Normal Shader'
+    };
+
+    // Color conversion helper
+    function hslToRgb(h, s, l) {
+      let r, g, b;
+      if (s === 0) {
+        r = g = b = l;
+      } else {
+        const hue2rgb = (p, q, t) => {
+          if (t < 0) t += 1;
+          if (t > 1) t -= 1;
+          if (t < 1/6) return p + (q - p) * 6 * t;
+          if (t < 1/2) return q;
+          if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+          return p;
+        };
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
+        r = hue2rgb(p, q, h + 1/3);
+        g = hue2rgb(p, q, h);
+        b = hue2rgb(p, q, h - 1/3);
+      }
+      return [r, g, b];
+    }
+
+    // Color Theme Generator
+    function getCubeColor(theme, x, y, z, dist, time, index) {
+      if (theme === 'magic') {
+        return [1, 1, 1]; // Magic mode computes normals in shader
+      }
+
+      if (theme === 'rainbow') {
+        let h = ((time * 0.15) + (dist * 0.005) + (y * 0.008)) % 1.0;
+        if (h < 0) h += 1.0;
+        return hslToRgb(h, 0.95, 0.52);
+      }
+
+      if (theme === 'neon') {
+        // High voltage Cyberpunk: Pink (#ff007f) vs Cyan (#00f2fe) vs Acid Yellow
+        let tVal = Math.sin(dist * 0.05 - time * 1.8) * 0.5 + 0.5;
+        let r = 0.0 * (1 - tVal) + 1.0 * tVal;
+        let g = 0.95 * (1 - tVal) + 0.0 * tVal;
+        let b = 1.0 * (1 - tVal) + 0.5 * tVal;
+        // Accent highlights on crests
+        if (y > 15) {
+          r = Math.min(1.0, r + 0.3);
+          g = Math.min(1.0, g + 0.3);
+        }
+        return [r, g, b];
+      }
+
+      if (theme === 'sunset') {
+        // Volcanic crimson -> Golden amber -> Deep dusk magenta
+        let normY = Math.max(0, Math.min(1, (y + 40) / 80));
+        let r = 1.0;
+        let g = Math.pow(normY, 1.5) * 0.85;
+        let b = Math.pow(1 - normY, 2) * 0.4;
+        return [r, g, b];
+      }
+
+      if (theme === 'aurora') {
+        // Luminous emerald green -> Cyan teal -> Royal violet
+        let wave = Math.sin(x * 0.03 + z * 0.03 + time * 1.2) * 0.5 + 0.5;
+        let r = 0.1 * (1 - wave) + 0.6 * wave;
+        let g = 1.0 * (1 - wave) + 0.1 * wave;
+        let b = 0.6 * (1 - wave) + 1.0 * wave;
+        return [r, g, b];
+      }
+
+      if (theme === 'vaporwave') {
+        // Pastel bubblegum pink and lavender sky blue
+        let wave = Math.sin(dist * 0.04 - time * 1.0) * 0.5 + 0.5;
+        let r = 1.0 * (1 - wave) + 0.45 * wave;
+        let g = 0.55 * (1 - wave) + 0.75 * wave;
+        let b = 0.85 * (1 - wave) + 1.0 * wave;
+        return [r, g, b];
+      }
+
+      return [1, 1, 1];
+    }
+
+    // Geometry Calculation Engine for All 5 Visual Modes
+    function calculateTargetPosition(mode, i, time, amp) {
+      let tx = 0, ty = 0, tz = 0;
+
+      switch(mode) {
+        case 0: {
+          // --- MODE 0: SINE WAVE OCEAN (11x11 Grid = 121 + 4 corners) ---
+          let gx = (i % 11) - 5;
+          let gz = Math.floor(i / 11) - 5;
+          let spacing = 19;
+          tx = gx * spacing;
+          tz = gz * spacing;
+          let d = Math.sqrt(tx * tx + tz * tz);
+          ty = Math.sin(d * 0.09 - time * 2.4) * (24 * amp) + 
+               Math.cos(tx * 0.07 + time * 1.6) * (10 * amp);
+          break;
+        }
+
+        case 1: {
+          // --- MODE 1: RUBIK'S HYPERCUBE TESSERACT (5x5x5 = 125 Cubes) ---
+          let ix = (i % 5) - 2;
+          let iy = (Math.floor(i / 5) % 5) - 2;
+          let iz = Math.floor(i / 25) - 2;
+          let baseSpacing = 20;
+
+          // Multi-phase cycle: 0..1 Expand, 1..2 Twist Slices, 2..3 Collapse, 3..4 Pulse
+          let cycle = (time * 0.6) % 4.0;
+          let explodeFactor = 1.0;
+
+          if (cycle < 1.0) {
+            // Eased explosion
+            let p = cycle;
+            explodeFactor = 1.0 + (p * p * (3 - 2 * p)) * 1.6 * amp;
+          } else if (cycle < 2.5) {
+            // Suspended floating matrix with slice rotation
+            explodeFactor = 1.0 + 1.6 * amp;
+          } else if (cycle < 3.2) {
+            // Recombination bounce
+            let p = (cycle - 2.5) / 0.7;
+            explodeFactor = 1.0 + (1 - p) * 1.6 * amp;
+          } else {
+            // Core breathing
+            explodeFactor = 1.0 + Math.sin((cycle - 3.2) * Math.PI * 2.5) * 0.15 * amp;
+          }
+
+          tx = ix * baseSpacing * explodeFactor;
+          ty = iy * baseSpacing * explodeFactor;
+          tz = iz * baseSpacing * explodeFactor;
+
+          // Slice twists: rotate outer layers around axes during suspended phase
+          if (cycle >= 1.0 && cycle < 2.5) {
+            let twistTime = (cycle - 1.0) * Math.PI * 2;
+            if (iy === 2) {
+              let angle = twistTime;
+              let rx = tx * Math.cos(angle) - tz * Math.sin(angle);
+              let rz = tx * Math.sin(angle) + tz * Math.cos(angle);
+              tx = rx; tz = rz;
+            } else if (iy === -2) {
+              let angle = -twistTime;
+              let rx = tx * Math.cos(angle) - tz * Math.sin(angle);
+              let rz = tx * Math.sin(angle) + tz * Math.cos(angle);
+              tx = rx; tz = rz;
+            }
+          }
+          break;
+        }
+
+        case 2: {
+          // --- MODE 2: CELESTIAL VORTEX (4 Concentric Planetary Rings) ---
+          // Ring distribution: 16, 24, 36, 49 cubes
+          let ring, ringIndex, ringCount, ringRadius, ringSpeed;
+          if (i < 16) {
+            ring = 0; ringIndex = i; ringCount = 16; ringRadius = 32; ringSpeed = 1.8;
+          } else if (i < 40) {
+            ring = 1; ringIndex = i - 16; ringCount = 24; ringRadius = 60; ringSpeed = -1.3;
+          } else if (i < 76) {
+            ring = 2; ringIndex = i - 40; ringCount = 36; ringRadius = 90; ringSpeed = 0.9;
+          } else {
+            ring = 3; ringIndex = i - 76; ringCount = 49; ringRadius = 124; ringSpeed = -0.65;
+          }
+
+          let theta = (ringIndex / ringCount) * Math.PI * 2 + time * ringSpeed * 0.7;
+          let r = ringRadius * amp;
+          tx = r * Math.cos(theta);
+          tz = r * Math.sin(theta);
+          ty = Math.sin(theta * 4 + time * 2.2) * (10 + ring * 4) * amp;
+          break;
+        }
+
+        case 3: {
+          // --- MODE 3: QUANTUM DOUBLE HELIX (DNA Spiral & Cross-Bridges) ---
+          let helixRadius = 48 * amp;
+          let totalHeight = 160 * amp;
+
+          if (i < 50) {
+            // Strand A
+            let progress = i / 50;
+            let u = progress * Math.PI * 5 + time * 1.2;
+            tx = helixRadius * Math.cos(u);
+            tz = helixRadius * Math.sin(u);
+            ty = (progress - 0.5) * totalHeight;
+          } else if (i < 100) {
+            // Strand B (180 deg phase offset)
+            let progress = (i - 50) / 50;
+            let u = progress * Math.PI * 5 + Math.PI + time * 1.2;
+            tx = helixRadius * Math.cos(u);
+            tz = helixRadius * Math.sin(u);
+            ty = (progress - 0.5) * totalHeight;
+          } else {
+            // Connecting Rungs
+            let rungIdx = i - 100; // 0..24
+            let progress = (rungIdx + 0.5) / 25;
+            let u = progress * Math.PI * 5 + time * 1.2;
+            let span = (Math.sin(rungIdx * 1.7) * 0.7); // spread along rung
+            tx = helixRadius * span * Math.cos(u);
+            tz = helixRadius * span * Math.sin(u);
+            ty = (progress - 0.5) * totalHeight;
+          }
+          break;
+        }
+
+        case 4: {
+          // --- MODE 4: SUPERNOVA STAR (Fibonacci Geodesic Sphere Explosion) ---
+          let phi = Math.acos(1 - 2 * (i + 0.5) / NUM_CUBES);
+          let theta = Math.PI * (1 + Math.sqrt(5)) * i;
+          
+          // Explosive breathing radius
+          let pulse = Math.pow(Math.sin(time * 1.8), 4);
+          let R = (45 + pulse * 65) * amp;
+
+          let rot = time * 0.4;
+          tx = R * Math.sin(phi) * Math.cos(theta + rot);
+          ty = R * Math.cos(phi);
+          tz = R * Math.sin(phi) * Math.sin(theta + rot);
+          break;
+        }
+      }
+
+      return { x: tx, y: ty, z: tz };
+    }
+
+    // Initialize the Visualizer
+    function initVisualizer() {
+      try {
+        // Instantiate XTK 3D Renderer
+        renderer = new X.renderer3D();
+        renderer.container = 'canvas-container';
+        renderer.init();
+
+        // Build 125 Cubes
+        for (let i = 0; i < NUM_CUBES; i++) {
+          let c = new X.cube();
+          c.lengthX = CUBE_SIZE;
+          c.lengthY = CUBE_SIZE;
+          c.lengthZ = CUBE_SIZE;
+          
+          // Initial placement
+          let pos = calculateTargetPosition(0, i, 0, 1.0);
+          c.center = [pos.x, pos.y, pos.z];
+          c.color = [0, 0.95, 1];
+          c.opacity = cubeOpacity;
+          c.caption = "Cube #" + (i + 1);
+
+          renderer.add(c);
+          cubes.push(c);
+
+          currentPositions.push({ x: pos.x, y: pos.y, z: pos.z });
+          targetPositions.push({ x: pos.x, y: pos.y, z: pos.z });
+
+          // Random rotational velocities for organic spinning
+          initialLocalRotations.push({
+            rx: (Math.random() - 0.5) * 1.8,
+            ry: (Math.random() - 0.5) * 2.2,
+            rz: (Math.random() - 0.5) * 1.5
+          });
+        }
+
+        // Camera Initialization
+        renderer.camera.position = [0, 110, 240];
+        renderer.camera.focus = [0, 0, 0];
+        renderer.camera.up = [0, 1, 0];
+
+        // Core Animation Loop Hook
+        renderer.onRender = renderLoop;
+
+        // Start Rendering
+        renderer.render();
+
+        showToast("Visualizer Initialized: Sine Wave Ocean", "🌊");
+      } catch (err) {
+        console.error("Initialization Failed:", err);
+        document.getElementById('error-banner').style.display = 'block';
+        document.getElementById('error-msg').innerText = err.message || "Failed to load XTK WebGL context.";
+      }
+    }
+
+    // Main 60FPS Frame Update Routine
+    function renderLoop() {
+      let now = performance.now();
+      let dt = Math.min((now - lastTimestamp) / 1000, 0.08); // Clamped delta time
+      lastTimestamp = now;
+
+      // Update Live FPS
+      frameCount++;
+      if (now - lastFpsTime >= 500) {
+        currentFps = Math.round((frameCount * 1000) / (now - lastFpsTime));
+        document.getElementById('fps-counter').innerText = currentFps;
+        frameCount = 0;
+        lastFpsTime = now;
+      }
+
+      // Advance Time
+      if (!isPaused) {
+        animTime += dt * animSpeed;
+      }
+
+      // Shockwave Physics
+      if (shockwaveActive) {
+        shockwaveRadius += dt * 170.0;
+        shockwaveStrength = Math.max(0, 1.0 - (shockwaveRadius / 180.0));
+        if (shockwaveStrength <= 0) {
+          shockwaveActive = false;
+        }
+      }
+
+      // Cinematic Camera Auto-Orbit
+      if (autoOrbit && !isPaused) {
+        renderer.camera.rotate([0.35 * dt * 60, 0]);
+      }
+
+      // Update Generative Synth if active
+      if (soundEnabled && filterNode) {
+        let fFreq = 380 + Math.sin(animTime * 2.0) * 220;
+        filterNode.frequency.setTargetAtTime(fFreq, audioCtx.currentTime, 0.05);
+      }
+
+      // Update Every Cube
+      const morphFactor = Math.min(1.0, dt * 7.5); // Smooth organic interpolation
+
+      for (let i = 0; i < NUM_CUBES; i++) {
+        let c = cubes[i];
+        let curr = currentPositions[i];
+        let target = calculateTargetPosition(activeMode, i, animTime, animAmp);
+
+        // Add interactive Shockwave impulse
+        let distCenter = Math.sqrt(curr.x * curr.x + curr.z * curr.z);
+        if (shockwaveActive) {
+          let distDiff = Math.abs(distCenter - shockwaveRadius);
+          if (distDiff < 35.0) {
+            let ripple = Math.sin((distCenter - shockwaveRadius) * 0.25);
+            let intensity = Math.exp(- (distDiff * distDiff) / 180.0) * shockwaveStrength * 40.0;
+            target.y += ripple * intensity;
+          }
+        }
+
+        // Smooth Lerp Position
+        curr.x += (target.x - curr.x) * morphFactor;
+        curr.y += (target.y - curr.y) * morphFactor;
+        curr.z += (target.z - curr.z) * morphFactor;
+
+        // Local Cube Rotation
+        if (!isPaused && spinSpeed > 0) {
+          let rot = initialLocalRotations[i];
+          c.transform.rotateX(rot.rx * spinSpeed * dt * 60);
+          c.transform.rotateY(rot.ry * spinSpeed * dt * 60);
+          c.transform.rotateZ(rot.rz * spinSpeed * dt * 60);
+        }
+
+        // Set World Translation Matrix
+        c.transform.matrix[12] = curr.x;
+        c.transform.matrix[13] = curr.y;
+        c.transform.matrix[14] = curr.z;
+        c.transform.modified();
+
+        // Dynamic Color Shading
+        if (activeTheme === 'magic') {
+          if (!c.magicmode) c.magicmode = true;
+        } else {
+          if (c.magicmode) c.magicmode = false;
+          let color = getCubeColor(activeTheme, curr.x, curr.y, curr.z, distCenter, animTime, i);
+          
+          // Shockwave color flash
+          if (shockwaveActive) {
+            let distDiff = Math.abs(distCenter - shockwaveRadius);
+            if (distDiff < 25.0) {
+              let flash = Math.exp(-(distDiff * distDiff) / 120.0) * shockwaveStrength;
+              color[0] = Math.min(1.0, color[0] + flash * 0.8);
+              color[1] = Math.min(1.0, color[1] + flash * 0.8);
+              color[2] = Math.min(1.0, color[2] + flash * 0.8);
+            }
+          }
+
+          c.color = color;
+        }
+
+        c.opacity = cubeOpacity;
+      }
+    }
+
+    // Mode Controller
+    function setMode(modeIndex) {
+      activeMode = modeIndex;
+      document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.classList.toggle('active', parseInt(btn.dataset.mode) === modeIndex);
+      });
+      showToast("Switched Mode: " + MODE_NAMES[modeIndex], "🚀");
+    }
+
+    // Color Theme Controller
+    function setTheme(themeKey) {
+      activeTheme = themeKey;
+      document.querySelectorAll('.color-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.theme === themeKey);
+      });
+      showToast("Color Theme: " + THEME_NAMES[themeKey], "🎨");
+    }
+
+    // Cycle to Next Theme
+    function cycleTheme() {
+      const themes = ['neon', 'rainbow', 'sunset', 'aurora', 'vaporwave', 'magic'];
+      let nextIdx = (themes.indexOf(activeTheme) + 1) % themes.length;
+      setTheme(themes[nextIdx]);
+    }
+
+    // Dynamic Slider Updates
+    function updateSliders() {
+      animSpeed = parseFloat(document.getElementById('slider-speed').value);
+      animAmp = parseFloat(document.getElementById('slider-amp').value);
+      spinSpeed = parseFloat(document.getElementById('slider-spin').value);
+      cubeOpacity = parseFloat(document.getElementById('slider-opacity').value);
+
+      document.getElementById('val-speed').innerText = animSpeed.toFixed(1) + 'x';
+      document.getElementById('val-amp').innerText = animAmp.toFixed(1) + 'x';
+      document.getElementById('val-spin').innerText = spinSpeed.toFixed(1) + 'x';
+      document.getElementById('val-opacity').innerText = cubeOpacity.toFixed(2);
+    }
+
+    // Interactive Shockwave Trigger
+    function triggerShockwave() {
+      shockwaveActive = true;
+      shockwaveRadius = 0.0;
+      shockwaveStrength = 1.0;
+      showToast("Shockwave Pulse Emitted!", "💥");
+    }
+
+    // Pause / Resume
+    function togglePause() {
+      isPaused = !isPaused;
+      document.getElementById('pause-icon').innerText = isPaused ? "▶" : "⏸";
+      document.getElementById('pause-text').innerText = isPaused ? "Resume" : "Pause";
+      document.getElementById('btn-pause').classList.toggle('active', isPaused);
+      showToast(isPaused ? "Animation Paused" : "Animation Resumed", isPaused ? "⏸" : "▶");
+    }
+
+    // Auto-Orbit Toggle
+    function toggleOrbit() {
+      autoOrbit = !autoOrbit;
+      document.getElementById('btn-orbit').classList.toggle('active', autoOrbit);
+      showToast(autoOrbit ? "Cinematic Auto-Orbit ON" : "Auto-Orbit OFF", "🔄");
+    }
+
+    // Camera Presets
+    function setCameraView(preset) {
+      if (!renderer || !renderer.camera) return;
+
+      switch(preset) {
+        case 'iso':
+          renderer.camera.position = [140, 130, 190];
+          break;
+        case 'top':
+          renderer.camera.position = [0, 270, 0.1];
+          break;
+        case 'side':
+          renderer.camera.position = [0, 15, 250];
+          break;
+        case 'close':
+          renderer.camera.position = [55, 35, 65];
+          break;
+        case 'reset':
+          renderer.camera.position = [0, 110, 240];
+          break;
+      }
+      renderer.camera.focus = [0, 0, 0];
+      renderer.camera.up = [0, 1, 0];
+      showToast("Camera: " + preset.toUpperCase() + " Preset", "📷");
+    }
+
+    // Toggle HUD Overlay
+    let hudVisible = true;
+    function toggleHUD() {
+      hudVisible = !hudVisible;
+      document.getElementById('ui-overlay').classList.toggle('hidden', !hudVisible);
+      document.getElementById('hud-toggle-text').innerText = hudVisible ? "Hide HUD" : "Show HUD";
+    }
+
+    // Toast Popups
+    let toastTimeout = null;
+    function showToast(msg, icon) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toast-msg').innerText = msg;
+      document.getElementById('toast-icon').innerText = icon || "✨";
+      toast.classList.add('show');
+
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2200);
+    }
+
+    // Ambient Web Audio Synthesizer (Generative Soundscape)
+    let audioCtx = null;
+    let osc1 = null, osc2 = null, gainNode = null, filterNode = null;
+    let soundEnabled = false;
+
+    function toggleSound() {
+      try {
+        if (!audioCtx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          audioCtx = new AudioContext();
+
+          gainNode = audioCtx.createGain();
+          gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+
+          filterNode = audioCtx.createBiquadFilter();
+          filterNode.type = 'lowpass';
+          filterNode.frequency.setValueAtTime(420, audioCtx.currentTime);
+
+          // Root tone (A2 = 110Hz)
+          osc1 = audioCtx.createOscillator();
+          osc1.type = 'sine';
+          osc1.frequency.setValueAtTime(110.0, audioCtx.currentTime);
+
+          // Fifth overtone (E3 = 164.8Hz)
+          osc2 = audioCtx.createOscillator();
+          osc2.type = 'triangle';
+          osc2.frequency.setValueAtTime(164.81, audioCtx.currentTime);
+
+          osc1.connect(filterNode);
+          osc2.connect(filterNode);
+          filterNode.connect(gainNode);
+          gainNode.connect(audioCtx.destination);
+
+          osc1.start();
+          osc2.start();
+        }
+
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+
+        soundEnabled = !soundEnabled;
+        let btn = document.getElementById('btn-sound');
+        let icon = document.getElementById('sound-icon');
+        let text = document.getElementById('sound-text');
+        let stat = document.getElementById('audio-stat');
+
+        if (soundEnabled) {
+          gainNode.gain.cancelScheduledValues(audioCtx.currentTime);
+          gainNode.gain.linearRampToValueAtTime(0.08, audioCtx.currentTime + 0.6);
+          btn.classList.add('active');
+          icon.innerText = "🔊";
+          text.innerText = "Sound: Synth Active";
+          stat.style.display = 'flex';
+          showToast("Ambient Audio Synth Active", "🎵");
+        } else {
+          gainNode.gain.cancelScheduledValues(audioCtx.currentTime);
+          gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.4);
+          btn.classList.remove('active');
+          icon.innerText = "🔈";
+          text.innerText = "Sound: Synth Muted";
+          stat.style.display = 'none';
+          showToast("Audio Muted", "🔈");
+        }
+      } catch (e) {
+        console.warn("Web Audio not supported or blocked:", e);
+      }
+    }
+
+    // Keyboard Shortcuts
+    window.addEventListener('keydown', function(e) {
+      // Don't intercept when focusing inputs
+      if (e.target.tagName === 'INPUT') return;
+
+      switch(e.key.toLowerCase()) {
+        case '1': setMode(0); break;
+        case '2': setMode(1); break;
+        case '3': setMode(2); break;
+        case '4': setMode(3); break;
+        case '5': setMode(4); break;
+        case 'c': cycleTheme(); break;
+        case ' ':
+          e.preventDefault();
+          togglePause();
+          break;
+        case 'o': toggleOrbit(); break;
+        case 'm': setTheme(activeTheme === 'magic' ? 'neon' : 'magic'); break;
+        case 'h': toggleHUD(); break;
+        case 'r': setCameraView('reset'); break;
+      }
+    });
+
+    // Canvas Click Trigger
+    document.getElementById('canvas-container').addEventListener('click', function(e) {
+      triggerShockwave();
+    });
+
+    // Boot on window load
+    window.onload = initVisualizer;
+  </script>
+</body>
+</html>

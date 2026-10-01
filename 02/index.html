@@ -1,2 +1,117 @@
-Ready for assignment 2.
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Tree Canopy - Crown Shyness</title>
+    <style>
+      html, body {
+        background-color: #050b14;
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+      }
+    </style>
+    <script type="text/javascript" src="https://get.goxtk.com/xtk_edge.js"></script>
+    <script type="text/javascript">
+      if (typeof X === 'undefined') {
+        document.write('<script type="text/javascript" src="js/xtk_edge.js"><\/script>');
+      }
+    </script>
+    <script type="text/javascript">
+      window.onload = function() {
 
+        // Initialize 3D renderer
+        var r = new X.renderer3D();
+        r.init();
+
+        // Helper to place cubes
+        function addCube(x, y, z, color, size) {
+          var c = new X.cube();
+          c.center = [x, y, z];
+          c.lengthX = c.lengthY = c.lengthZ = size || 5;
+          c.color = color;
+          r.add(c);
+          return c;
+        }
+
+        // Centers for the 3 trees (arranged at 120-degree intervals in XZ plane)
+        var centers = [
+          [0, -32],    // Tree 1: Top (North)
+          [-28, 18],   // Tree 2: Bottom-Left (South-West)
+          [28, 18]     // Tree 3: Bottom-Right (South-East)
+        ];
+
+        // Colors for each tree canopy
+        var colors = [
+          [0.15, 0.75, 0.25], // Tree 1: Emerald Forest Green
+          [0.96, 0.55, 0.10], // Tree 2: Autumn Amber Orange
+          [0.92, 0.30, 0.65]  // Tree 3: Cherry Blossom Pink
+        ];
+
+        var trunkColor = [0.38, 0.22, 0.10];
+
+        // 1. Trunks rising from forest floor (y = -45) up into each canopy (y = 25)
+        for (var t = 0; t < 3; t++) {
+          var tx = centers[t][0];
+          var tz = centers[t][1];
+          for (var y = -45; y <= 25; y += 7) {
+            addCube(tx, y, tz, trunkColor, 6);
+          }
+        }
+
+        // 2. Canopies with Crown Shyness channel-gaps between them
+        // Sampling grid across the overhead canopy dome
+        var gapThreshold = 9.0; // Width of crown shyness channel
+        var maxCrownRadius = 30.0;
+
+        for (var x = -50; x <= 50; x += 5) {
+          for (var z = -50; z <= 50; z += 5) {
+
+            // Distance to each of the 3 tree centers
+            var d0 = Math.sqrt((x - centers[0][0]) * (x - centers[0][0]) + (z - centers[0][1]) * (z - centers[0][1]));
+            var d1 = Math.sqrt((x - centers[1][0]) * (x - centers[1][0]) + (z - centers[1][1]) * (z - centers[1][1]));
+            var d2 = Math.sqrt((x - centers[2][0]) * (x - centers[2][0]) + (z - centers[2][1]) * (z - centers[2][1]));
+
+            // Determine closest and second-closest tree
+            var dists = [
+              { id: 0, d: d0 },
+              { id: 1, d: d1 },
+              { id: 2, d: d2 }
+            ].sort(function(a, b) { return a.d - b.d; });
+
+            var closest = dists[0];
+            var secondClosest = dists[1];
+            var diff = secondClosest.d - closest.d;
+
+            // Crown Shyness condition:
+            // Foliage stops growing when approaching a neighboring tree's territory,
+            // leaving a distinct negative-space channel of open sky between them.
+            if (closest.d <= maxCrownRadius && diff >= gapThreshold) {
+              var treeColor = colors[closest.id];
+
+              // Base canopy layer
+              addCube(x, 30, z, treeColor, 4.8);
+
+              // Upper canopy dome layer for depth
+              if (closest.d <= maxCrownRadius * 0.75 && diff >= gapThreshold + 2) {
+                addCube(x, 35, z, treeColor, 4.8);
+              }
+            }
+          }
+        }
+
+        // Camera POV: positioned on the forest floor looking directly UP at the 3 tree crowns
+        r.camera.position = [0, -50, 0.1];
+        r.camera.focus = [0, 30, 0];
+        r.camera.up = [0, 0, -1];
+
+        // Render scene
+        r.render();
+
+      };
+    </script>
+  </head>
+  <body>
+  </body>
+</html>
